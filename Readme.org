@@ -1,0 +1,5 @@
+* Templates
+  - create a vpc with:
+    - 6 subnets
+    - a nat gateway interfacing to 2 private subnets
+    - a internet gateway interfacing to 2 public subnets
