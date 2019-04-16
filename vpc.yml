@@ -2,14 +2,59 @@
 Description: >-
   An AWS VPC with model according to https://medium.com/aws-activate-startup-blog/practical-vpc-design-8412e1a18dcc
 AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  VPCName:
+    Description: The name of the VPC being created.
+    Type: String
+    Default: "preprod-vpc"
+  VPCEnvironment:
+    Description: The envrionment vpc is being created for
+    Type: String
+    Default: "preprod"
+
+Mappings:
+  SubnetConfig:
+    VPC:
+      CIDR: "10.0.0.0/16"
+    PublicA:
+      CIDR: "10.0.32.0/20"
+      Name: "PublicA"
+    PublicB:
+      CIDR: "10.0.96.0/20"
+      Name: "PublicB"
+    PrivateA:
+      CIDR: "10.0.0.0/19"
+      Name: "PrivateA"
+    PrivateB:
+      CIDR: "10.0.64.0/19"
+      Name: "PrivateB"
+    ProtectedA:
+      CIDR: "10.0.48.0/21"
+      Name: "ProtectedA"
+    ProtectedB:
+      CIDR: "10.0.112.0/21"
+      Name: "ProtectedB"
+
 Resources:
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 10.0.0.0/16
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "VPC"
+          - "CIDR"
       EnableDnsSupport: true
       EnableDnsHostnames: true
       InstanceTenancy: default
+      Tags:
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
+        - Key: "Name"
+          Value: !Ref 'VPCName'
+        - Key: "StackName"
+          Value: !Ref "AWS::StackName"
+      
   InternetGateway:
     Type: AWS::EC2::InternetGateway
   VPCGatewayAttachment:
@@ -18,11 +63,16 @@ Resources:
         VpcId: !Ref VPC
         InternetGatewayId: !Ref InternetGateway
 
-  ##### Routing ######################      
+  ##### Routing ######################
   RouteTablePublic:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
+      Tags:
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
+        - Key: "Name"
+          Value: "public-rtb"
   InternetRoute:
     Type: AWS::EC2::Route
     DependsOn: RouteTablePublic
@@ -36,19 +86,57 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.0.0/19
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "PrivateA"
+          - "CIDR"
+      Tags:
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
+        - Key: "Name"
+          Value:
+            Fn::FindInMap:
+              - "SubnetConfig"
+              - "PrivateA"
+              - "Name"
   SubnetAPublic:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.32.0/20
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "PublicA"
+          - "CIDR"
       MapPublicIpOnLaunch: true
+      Tags:
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
+        - Key: "Name"
+          Value:
+            Fn::FindInMap:
+              - "SubnetConfig"
+              - "PublicA"
+              - "Name"
   SubnetAProtected:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.48.0/21
-
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "ProtectedA"
+          - "CIDR"
+      Tags:
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
+        - Key: "Name"
+          Value:
+            Fn::FindInMap:
+              - "SubnetConfig"
+              - "ProtectedA"
+              - "Name"
   SubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -60,18 +148,57 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.64.0/19
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "PrivateB"
+          - "CIDR"
+      Tags:
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
+        - Key: "Name"
+          Value:
+            Fn::FindInMap:
+              - "SubnetConfig"
+              - "PrivateB"
+              - "Name"   
   SubnetBPublic:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.96.0/20
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "PublicB"
+          - "CIDR"
       MapPublicIpOnLaunch: true
+      Tags:
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
+        - Key: "Name"
+          Value:
+            Fn::FindInMap:
+              - "SubnetConfig"
+              - "PublicB"
+              - "Name"
   SubnetBProtected:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: 10.0.112.0/21
+      CidrBlock:
+        Fn::FindInMap:
+          - "SubnetConfig"
+          - "ProtectedB"
+          - "CIDR"
+      Tags:
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
+        - Key: "Name"
+          Value:
+            Fn::FindInMap:
+              - "SubnetConfig"
+              - "ProtectedB"
+              - "Name"
 
   SubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -96,13 +223,18 @@ Resources:
           - AllocationId
       SubnetId: !Ref SubnetAPublic
       Tags:
-        - Key: env
-          Value: preprod
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
 
   RouteTablePrivate:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
+      Tags:
+        - Key: "Env"
+          Value: !Ref 'VPCEnvironment'
+        - Key: "Name"
+          Value: "private-rtb"
         
   PrivateNatRoute:
     Type: AWS::EC2::Route
